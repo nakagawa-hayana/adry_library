@@ -62,6 +62,30 @@ pub fn flush_stdout() {
     let _ = std::io::stdout().flush();
 }
 
+pub trait FromInput: Sized {
+    fn read_from<F: FnMut() -> String>(next: &mut F) -> Self;
+}
+
+macro_rules! __impl_from_input_via_parse {
+    ($($t:ty),* $(,)?) => {
+        $(
+            impl FromInput for $t {
+                fn read_from<F: FnMut() -> String>(next: &mut F) -> Self {
+                    next().parse().expect("Parse error")
+                }
+            }
+        )*
+    };
+}
+
+__impl_from_input_via_parse!(
+    i8, i16, i32, i64, i128, isize,
+    u8, u16, u32, u64, u128, usize,
+    f32, f64,
+    bool,
+    String, char,
+);
+
 #[macro_export]
 macro_rules! input {
     (source = $s:expr, $($r:tt)*) => {
@@ -101,25 +125,53 @@ macro_rules! read_value {
         $crate::read_value!($next, usize) - 1
     };
     ($next:expr, $t:ty) => {
-        $next().parse::<$t>().expect("Parse error")
+        <$t as $crate::io::FromInput>::read_from(&mut $next)
     };
 }
 
 #[macro_export]
-macro_rules! input_match {
-    ($($disc:literal => $path:path { $($field:ident : $t:tt),* $(,)? }),+ $(,)?) => {{
-        $crate::input! { __disc: usize }
-        match __disc {
-            $(
-                $disc => {
-                    $crate::input! { $($field: $t),* }
-                    $path { $($field),* }
-                }
-            )+
-            _ => panic!("input_match!: unexpected discriminator: {}", __disc),
+macro_rules! __query_field_type {
+    (usize1) => { usize };
+    (chars) => { Vec<char> };
+    ([ $t:tt ; $_len:expr ]) => { Vec<$crate::__query_field_type!($t)> };
+    (( $($t:tt),* )) => { ( $($crate::__query_field_type!($t)),* ) };
+    ($t:ty) => { $t };
+}
+
+#[macro_export]
+macro_rules! define_query {
+    (
+        $(#[$attr:meta])*
+        enum $name:ident {
+            $($variant:ident { $($field:ident : $t:tt),* $(,)? }),* $(,)?
         }
-    }};
+    ) => {
+        $(#[$attr])*
+        enum $name {
+            $($variant { $($field: $crate::__query_field_type!($t),)* }),*
+        }
+        impl $crate::io::FromInput for $name {
+            #[allow(unused_assignments)]
+            fn read_from<__F: ::std::ops::FnMut() -> ::std::string::String>(__next_ref: &mut __F) -> Self {
+                let mut __next = move || __next_ref();
+                let __disc: usize = <usize as $crate::io::FromInput>::read_from(&mut __next);
+                let mut __idx: usize = 0;
+                $(
+                    __idx += 1;
+                    if __disc == __idx {
+                        $(let $field = $crate::read_value!(__next, $t);)*
+                        return $name::$variant { $($field),* };
+                    }
+                )*
+                panic!(
+                    "define_query!: unknown discriminator {} for {}",
+                    __disc,
+                    stringify!($name)
+                );
+            }
+        }
+    };
 }
 
 pub use input;
-pub use input_match;
+pub use define_query;
