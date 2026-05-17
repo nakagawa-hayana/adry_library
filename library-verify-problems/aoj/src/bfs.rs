@@ -20,7 +20,7 @@ impl BfsHandler for S {
         self.graph[u].iter().map(|v| (*v, d + 1)).collect_vec()
     }
 
-    fn mark_visited(&mut self, state: &Self::State) {
+    fn mark_visited(&mut self, state: &Self::State, _from: Option<&Self::State>) {
         self.dist[state.0] = Some(state.1);
     }
 
