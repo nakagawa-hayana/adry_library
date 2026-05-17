@@ -105,4 +105,21 @@ macro_rules! read_value {
     };
 }
 
+#[macro_export]
+macro_rules! input_match {
+    ($($disc:literal => $path:path { $($field:ident : $t:tt),* $(,)? }),+ $(,)?) => {{
+        $crate::input! { __disc: usize }
+        match __disc {
+            $(
+                $disc => {
+                    $crate::input! { $($field: $t),* }
+                    $path { $($field),* }
+                }
+            )+
+            _ => panic!("input_match!: unexpected discriminator: {}", __disc),
+        }
+    }};
+}
+
 pub use input;
+pub use input_match;
