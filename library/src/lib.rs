@@ -4,6 +4,7 @@ pub mod data_structure;
 pub mod example;
 pub mod graph;
 pub mod hash;
+pub mod io;
 pub mod math;
 pub mod mink_sum;
 pub mod misc;

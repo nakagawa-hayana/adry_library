@@ -1,24 +1,78 @@
-// thanks: https://qiita.com/tanakh/items/0ba42c7ca36cd29d0ac8
+use std::cell::RefCell;
+use std::io::{BufRead, BufReader, Stdin, Write};
+
+pub struct StdinSource {
+    reader: BufReader<Stdin>,
+    buf: Vec<u8>,
+    pos: usize,
+}
+
+impl StdinSource {
+    pub fn new() -> Self {
+        Self {
+            reader: BufReader::new(std::io::stdin()),
+            buf: Vec::new(),
+            pos: 0,
+        }
+    }
+
+    pub fn next_token(&mut self) -> String {
+        loop {
+            while self.pos < self.buf.len() && self.buf[self.pos].is_ascii_whitespace() {
+                self.pos += 1;
+            }
+            if self.pos < self.buf.len() {
+                break;
+            }
+            self.buf.clear();
+            self.pos = 0;
+            let n = self
+                .reader
+                .read_until(b'\n', &mut self.buf)
+                .expect("stdin read failed");
+            if n == 0 {
+                panic!("unexpected EOF on stdin");
+            }
+        }
+        let start = self.pos;
+        while self.pos < self.buf.len() && !self.buf[self.pos].is_ascii_whitespace() {
+            self.pos += 1;
+        }
+        std::str::from_utf8(&self.buf[start..self.pos])
+            .expect("non-utf8 token")
+            .to_string()
+    }
+}
+
+impl Default for StdinSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+thread_local! {
+    pub static SOURCE: RefCell<StdinSource> = RefCell::new(StdinSource::new());
+}
+
+pub fn next_token() -> String {
+    SOURCE.with(|s| s.borrow_mut().next_token())
+}
+
+pub fn flush_stdout() {
+    let _ = std::io::stdout().flush();
+}
 
 #[macro_export]
 macro_rules! input {
     (source = $s:expr, $($r:tt)*) => {
-        let mut iter = $s.split_whitespace();
-        let mut next = || { iter.next().unwrap() };
-        $crate::input_inner!{next, $($r)*}
+        let mut __iter = $s.split_whitespace();
+        let mut __next = || __iter.next().unwrap().to_string();
+        $crate::input_inner!{__next, $($r)*}
     };
     ($($r:tt)*) => {
-        let stdin = std::io::stdin();
-        let mut bytes = std::io::Read::bytes(std::io::BufReader::new(stdin.lock()));
-        let mut next = move || -> String {
-            bytes
-                .by_ref()
-                .map(|r| r.unwrap() as char)
-                .skip_while(|c| c.is_whitespace())
-                .take_while(|c| !c.is_whitespace())
-                .collect()
-        };
-        $crate::input_inner!{next, $($r)*}
+        $crate::io::flush_stdout();
+        let mut __next = || $crate::io::next_token();
+        $crate::input_inner!{__next, $($r)*}
     };
 }
 
@@ -51,3 +105,4 @@ macro_rules! read_value {
     };
 }
 
+pub use input;
