@@ -90,6 +90,12 @@ impl Pcg32 {
         (u << 64) | d
     }
 
+    /// [0, 1) の一様乱数
+    #[inline]
+    pub fn gen_f64(&mut self) -> f64 {
+        (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
+    }
+
     pub fn gen_range<T, R>(&mut self, range: R) -> T
     where
         T: PcgRandomInt,
